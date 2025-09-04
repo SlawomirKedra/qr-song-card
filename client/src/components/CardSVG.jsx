@@ -4,13 +4,31 @@ import QRCode from 'qrcode';
 const PAGE_W = 210;
 const PAGE_H = 297;
 
+// Render QR as native rects based on matrix to guarantee exact fill and identical PDF.
+function makeQRRects(text, sideMm, quietModules=1, ecl='M'){
+  const model = QRCode.create(text, { errorCorrectionLevel: ecl });
+  const size = model.modules.size;
+  const data = model.modules.data;
+  const usable = size + quietModules*2; // add quiet zone around
+  const moduleMm = sideMm / usable;
+  const rects = [];
+  for (let y=0; y<size; y++){
+    for (let x=0; x<size; x++){
+      if (data[y*size + x]) {
+        const rx = (x + quietModules) * moduleMm;
+        const ry = (y + quietModules) * moduleMm;
+        rects.push({ x: rx, y: ry, w: moduleMm, h: moduleMm });
+      }
+    }
+  }
+  return { rects, sideWithQuiet: moduleMm * usable };
+}
+
 function useMeasureCanvas() {
   const ref = useRef(null);
   if (!ref.current) ref.current = document.createElement('canvas');
-  const ctx = ref.current.getContext('2d');
-  return ctx;
+  return ref.current.getContext('2d');
 }
-
 function fitLines(ctx, text, basePx, maxWidthPx, maxLines=2, fontWeight='700', fontStyle='normal') {
   let size = basePx;
   const tryWrap = (sz) => {
@@ -21,23 +39,16 @@ function fitLines(ctx, text, basePx, maxWidthPx, maxLines=2, fontWeight='700', f
     for (const w of words) {
       const next = (cur ? cur + ' ' : '') + w;
       const width = ctx.measureText(next).width;
-      if (width <= maxWidthPx) {
-        cur = next;
-      } else {
-        if (cur) lines.push(cur);
-        cur = w;
-      }
+      if (width <= maxWidthPx) cur = next;
+      else { if (cur) lines.push(cur); cur = w; }
     }
     if (cur) lines.push(cur);
     if (lines.length > maxLines) {
       const take = Math.ceil(lines.length/2);
-      const l1 = lines.slice(0, take).join(' ');
-      const l2 = lines.slice(take).join(' ');
-      return { lines: [l1, l2].slice(0, maxLines), size: sz };
+      return { lines: [lines.slice(0,take).join(' '), lines.slice(take).join(' ')], size: sz };
     }
     return { lines, size: sz };
   };
-
   let wrapped = tryWrap(size);
   while (wrapped.lines.some(l => ctx.measureText(l).width > maxWidthPx) && size > 6) {
     size -= 0.5;
@@ -46,46 +57,35 @@ function fitLines(ctx, text, basePx, maxWidthPx, maxLines=2, fontWeight='700', f
   return wrapped;
 }
 
-const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=5 }, ref) {
+const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=4 }, ref) {
   const margin = 4;
-  const cols = Number(columns);
+  const cols = 4;
   const availW = PAGE_W - margin * (cols + 1);
   const S = availW / cols;   // square side in mm
 
-  const [qrInner, setQrInner] = useState('');
   const ctx = useMeasureCanvas();
 
-  useEffect(() => {
-    const text = song?.url || `${song?.title||''} - ${song?.artist||''}`;
-    let cancelled = false;
-    QRCode.toString(text, { type: 'svg', errorCorrectionLevel: 'M', margin: 0 })
-      .then(svg => {
-        if (cancelled) return;
-        const inner = svg.replace(/^[\s\S]*?<svg[^>]*>/i, '').replace(/<\/svg>\s*$/i, '');
-        setQrInner(inner);
-      })
-      .catch(()=>{});
-    return () => { cancelled = true; };
-  }, [song?.url, song?.title, song?.artist]);
-
-  const pxPerMm = 3.78;
-  const baseArtistPx = Math.max(12, S * 0.10 * pxPerMm);
-  const baseYearPx   = Math.max(30, S * 0.30 * pxPerMm);
-  const baseTitlePx  = Math.max(11, S * 0.09 * pxPerMm);
-
+  const text = song?.url || `${song?.title||''} - ${song?.artist||''}`;
+  const qr = useMemo(() => makeQRRects(text, S*0.995, 1, 'M'), [text, S]); // almost full side, 1-module quiet
   const A = song?.artist || 'Artist';
   const Y = song?.year || '1991';
   const T = song?.title || 'Song Title';
 
-  const contentPad = S * 0.10;
-  const maxTextWidthPx = (S - contentPad*2) * pxPerMm;
+  const pxPerMm = 3.78;
+  const baseArtistPx = Math.max(12, S * 0.095 * pxPerMm);
+  const baseYearPx   = Math.max(30, S * 0.30 * pxPerMm);
+  const baseTitlePx  = Math.max(11, S * 0.09  * pxPerMm);
+
+  const pad = S * 0.10;
+  const maxTextWidthPx = (S - pad*2) * pxPerMm;
 
   const artistFit = fitLines(ctx, A, baseArtistPx, maxTextWidthPx, 2, '700', 'normal');
   const titleFit  = fitLines(ctx, T, baseTitlePx, maxTextWidthPx, 2, '500', 'italic');
 
-  const qrSide = S * 0.99;
-  const qrX = (S - qrSide) / 2;
-  const qrY = (S - qrSide) / 2;
+  // vertical anchors with extra spacing so blocks never collide
+  const artistBaseY = S * 0.28;
+  const yearBaseY   = S * 0.52;
+  const titleBaseY  = S * 0.75;
 
   return (
     <svg ref={ref} xmlns="http://www.w3.org/2000/svg" width={`${S}mm`} height={`${S}mm`} viewBox={`0 0 ${S} ${S}`}>
@@ -94,25 +94,29 @@ const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=5 }, r
         <rect x="1.4" y="1.4" width={S-2.8} height={S-2.8} fill="none" stroke="black" strokeWidth="0.25" opacity="0.35" rx="2" ry="2"/>
         {artistFit.lines.map((line, i) => (
           <text key={'a'+i}
-            x={S/2} y={S*0.30 + i * (artistFit.size/pxPerMm * 1.10)}
+            x={S/2} y={artistBaseY + i * (artistFit.size/pxPerMm * 1.15)}
             fontFamily="Helvetica, Arial, sans-serif" fontWeight="700" fontSize={artistFit.size/pxPerMm}
             textAnchor="middle" fill="black">{line}</text>
         ))}
-        <text
-          x={S/2} y={S*0.52}
-          fontFamily="Helvetica, Arial, sans-serif" fontWeight="800"
-          fontSize={Math.min(baseYearPx, (S*0.55*pxPerMm)) / pxPerMm}
+        <text x={S/2} y={yearBaseY} fontFamily="Helvetica, Arial, sans-serif" fontWeight="800"
+          fontSize={Math.min(baseYearPx, (S*0.56*pxPerMm)) / pxPerMm}
           textAnchor="middle" fill="black" letterSpacing="0.2">{Y}</text>
         {titleFit.lines.map((line, i) => (
           <text key={'t'+i}
-            x={S/2} y={S*0.70 + i * (titleFit.size/pxPerMm * 1.15)}
+            x={S/2} y={titleBaseY + i * (titleFit.size/pxPerMm * 1.2)}
             fontFamily="Helvetica, Arial, sans-serif" fontStyle="italic" fontWeight="500" fontSize={titleFit.size/pxPerMm}
             textAnchor="middle" fill="black">{line}</text>
         ))}
       </g>)}
       {face==='front' && (<g>
-        <rect x={qrX} y={qrY} width={qrSide} height={qrSide} fill="white" stroke="black" strokeWidth="0.45" rx="1" ry="1"/>
-        <g transform={`translate(${qrX}, ${qrY}) scale(${qrSide/100})`} dangerouslySetInnerHTML={{__html: qrInner}}/>
+        {/* QR as rects */}
+        <g transform={`translate(${(S - qr.sideWithQuiet)/2}, ${(S - qr.sideWithQuiet)/2})`}>
+          {qr.rects.map((r, i) => (
+            <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} fill="black" />
+          ))}
+        </g>
+        {/* rounded frame over QR */}
+        <rect x="0.5" y="0.5" width={S-1} height={S-1} rx="2" ry="2" fill="none" stroke="black" strokeWidth="0.6"/>
       </g>)}
     </svg>
   );
