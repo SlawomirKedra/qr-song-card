@@ -3,17 +3,17 @@ import QRCode from 'qrcode';
 
 function classNames(...xs){return xs.filter(Boolean).join(' ')}
 
-export default function Card({ song, theme='light' }) {
+export default function Card({ song, theme='light', face='front' }) {
   const [qr, setQr] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
     const text = song.url || `${song.title} - ${song.artist}`;
+    let cancelled = false;
     (async () => {
       try {
         const dataUrl = await QRCode.toDataURL(text, {
           margin: 1,
-          width: 700,
+          width: 1000,
           errorCorrectionLevel: 'M'
         });
         if (!cancelled) setQr(dataUrl);
@@ -29,90 +29,82 @@ export default function Card({ song, theme='light' }) {
       case 'dark':
         return {
           bg: 'bg-slate-900',
-          panel: 'bg-slate-800/70',
+          panel: 'bg-slate-800',
           title: 'text-white',
+          subtle: 'text-slate-300',
+          border: 'border-slate-700',
           accent: 'bg-emerald-400',
         };
       case 'neon':
         return {
           bg: 'bg-black',
-          panel: 'bg-fuchsia-500/20',
+          panel: 'bg-fuchsia-500/10',
           title: 'text-fuchsia-300',
+          subtle: 'text-fuchsia-100/70',
+          border: 'border-fuchsia-700/60',
           accent: 'bg-fuchsia-400',
         };
       default:
         return {
           bg: 'bg-white',
-          panel: 'bg-slate-100',
+          panel: 'bg-slate-50',
           title: 'text-slate-900',
+          subtle: 'text-slate-600',
+          border: 'border-slate-200',
           accent: 'bg-indigo-500',
         };
     }
   }, [theme]);
 
+  if (face === 'front') {
+    return (
+      <div
+        className={classNames(
+          'w-[86mm] h-[120mm] rounded-xl shadow-lg overflow-hidden border relative flex items-center justify-center',
+          themeCls.bg, themeCls.border
+        )}
+        style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+      >
+        <div className={classNames('w-[70mm] h-[70mm] rounded-lg bg-white flex items-center justify-center border', theme === 'light' ? 'border-slate-300' : 'border-slate-600')}>
+          {qr ? <img src={qr} alt="QR" className="w-[66mm] h-[66mm] object-contain" /> : <div className="opacity-60 text-xs">QR...</div>}
+        </div>
+        <div className="absolute bottom-2 right-3 text-[8px] opacity-40">qr</div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={classNames(
-        'w-[86mm] h-[120mm] rounded-xl shadow-lg overflow-hidden border relative',
-        theme === 'light' ? 'border-slate-200' : 'border-slate-700',
-        themeCls.bg
+        'w-[86mm] h-[120mm] rounded-xl shadow-lg overflow-hidden border relative p-4',
+        themeCls.bg, themeCls.border
       )}
       style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
     >
-      {/* Cover */}
-      <div className={classNames('h-[48mm] w-full object-cover flex items-center justify-center', themeCls.panel)}>
-        {song.cover ? (
-          <img src={song.cover} alt="Okładka" className="max-h-[48mm] w-full object-cover" />
-        ) : (
-          <div className="opacity-60 text-xs">Brak okładki</div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="p-3 flex flex-col gap-2">
-        <div className="flex items-start gap-2">
-          <div className="flex-1">
-            <div className={classNames('font-semibold leading-tight', themeCls.title)}>
-              {song.title || <span className="opacity-50">Tytuł</span>}
-            </div>
-            <div className={classNames('text-sm opacity-80', themeCls.title)}>
-              {song.artist || <span className="opacity-50">Wykonawca</span>}
-              {song.year ? <span className="opacity-60"> • {song.year}</span> : null}
-            </div>
+      <div className="flex flex-col h-full">
+        <div className="flex-1 flex flex-col">
+          <div className={classNames('text-xs uppercase tracking-wide mb-1', themeCls.subtle)}>Utwór</div>
+          <div className={classNames('text-lg font-semibold leading-tight', themeCls.title)}>
+            {song.title || <span className="opacity-50">Tytuł</span>}
           </div>
-          <div className={classNames('px-2 py-1 rounded text-[10px] font-medium text-black', themeCls.accent)}>
-            QR
+          <div className={classNames('text-sm mt-1', themeCls.subtle)}>
+            {song.artist || <span className="opacity-50">Wykonawca</span>}
+            {song.year ? <span> • {song.year}</span> : null}
           </div>
         </div>
 
-        <div className="flex-1 mt-1 grid grid-cols-2 gap-2">
-          <div className="col-span-1 rounded-lg border border-slate-300/30 bg-white p-1 flex items-center justify-center">
-            {qr ? <img src={qr} className="w-full h-full object-contain" alt="QR" /> : <div className="text-xs opacity-60">QR...</div>}
-          </div>
-          <div className="col-span-1 text-[10px] opacity-80 leading-snug px-1">
-            <div>🔗 {song.url ? shorten(song.url) : 'brak URL'}</div>
-            <div className="mt-1 opacity-70">
-              Zeskanuj QR w swojej aplikacji skanującej, aby odtworzyć utwór.
+        <div className="mt-3">
+          {song.cover ? (
+            <img src={song.cover} alt="Okładka" className="w-full h-[48mm] object-cover rounded-lg border border-black/10" />
+          ) : (
+            <div className={classNames('w-full h-[48mm] rounded-lg flex items-center justify-center text-xs', themeCls.panel)}>
+              Brak okładki
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      <div className="absolute bottom-2 right-3 text-[8px] opacity-50">
-        qrsong-cards
-      </div>
+      <div className="absolute bottom-2 right-3 text-[8px] opacity-40">info</div>
     </div>
   );
-}
-
-function shorten(u){
-  try {
-    const url = new URL(u);
-    const host = url.hostname.replace('www.', '');
-    let path = url.pathname;
-    if (path.length > 24) path = path.slice(0, 24) + '…';
-    return host + path;
-  } catch {
-    return u?.slice(0, 28) + (u?.length > 28 ? '…' : '');
-  }
 }
