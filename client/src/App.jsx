@@ -4,13 +4,27 @@ import Card from './components/Card.jsx';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
+const CARD_W_MM = 37;
+const CARD_H_MM = 52;
+const PAGE_W = 210;
+const PAGE_H = 297;
+
+const sampleSong = {
+  id: 'sample',
+  title: 'Smells Like Teen Spirit',
+  artist: 'Nirvana',
+  year: '1991',
+  url: 'https://open.spotify.com/track/5ghIJDpPoe3CfHMGu71E6T',
+  cover: ''
+};
+
 function withIds(tracks){
   return tracks.map(t => ({ ...t, id: Math.random().toString(36).slice(2) }));
 }
 
 export default function App() {
   const [songs, setSongs] = useState([]);
-  const [theme, setTheme] = useState('light'); // light | dark | neon
+  const [theme, setTheme] = useState('bw-classic'); // default B/W
   const cardFrontRefs = useRef({});
   const cardBackRefs = useRef({});
 
@@ -30,7 +44,8 @@ export default function App() {
   const exportPDF = async (face) => {
     const refs = face === 'front' ? cardFrontRefs.current : cardBackRefs.current;
     const images = [];
-    for (const song of songs) {
+    const items = songs.length ? songs : [sampleSong]; // jeżeli ktoś nie wczytał, pozwól 1 podgląd
+    for (const song of items) {
       const el = refs[song.id];
       if (!el) continue;
       const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff' });
@@ -38,12 +53,17 @@ export default function App() {
     }
     if (!images.length) return;
 
+    const margin = 4;           // mm
+    const cols = 5;
+    const aspect = CARD_W_MM / CARD_H_MM;
+    const rows = Math.max(1, Math.floor((PAGE_H - margin) / (CARD_H_MM + margin))); // zwykle 5
+
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = 210, pageH = 297;
-    const cols = 2, rows = 3;
-    const margin = 8;
-    const cellW = (pageW - margin * (cols + 1)) / cols;
-    const cellH = (pageH - margin * (rows + 1)) / rows;
+    const cellW = (PAGE_W - margin * (cols + 1)) / cols;
+    const cellH = (PAGE_H - margin * (rows + 1)) / rows;
+
+    const imgW = Math.min(cellW, cellH * aspect);
+    const imgH = imgW / aspect;
 
     let i = 0;
     for (const img of images) {
@@ -51,13 +71,10 @@ export default function App() {
       const row = Math.floor(i / cols) % rows;
       if (i !== 0 && col === 0 && row === 0) doc.addPage();
 
-      const aspect = 86 / 120;
-      let w = cellW, h = w / aspect;
-      if (h > cellH) { h = cellH; w = h * aspect; }
-      const x = margin + col * (cellW + margin) + (cellW - w) / 2;
-      const y = margin + row * (cellH + margin) + (cellH - h) / 2;
+      const x = margin + col * (cellW + margin) + (cellW - imgW) / 2;
+      const y = margin + row * (cellH + margin) + (cellH - imgH) / 2;
 
-      doc.addImage(img, 'PNG', x, y, w, h);
+      doc.addImage(img, 'PNG', x, y, imgW, imgH);
       i++;
     }
 
@@ -75,9 +92,11 @@ export default function App() {
               onChange={(e) => setTheme(e.target.value)}
               className="bg-slate-800 border border-slate-700 rounded px-3 py-2"
             >
+              <option value="bw-classic">Motyw: BW Classic</option>
+              <option value="bw-minimal">Motyw: BW Minimal</option>
+              <option value="bw-contrast">Motyw: BW Contrast</option>
               <option value="light">Motyw: Jasny</option>
               <option value="dark">Motyw: Ciemny</option>
-              <option value="neon">Motyw: Neon</option>
             </select>
             <button onClick={() => exportPDF('front')} className="px-3 py-2 rounded bg-emerald-500 hover:bg-emerald-600 text-white">
               PDF: Fronty (QR)
@@ -93,9 +112,20 @@ export default function App() {
         <section className="no-print my-6 bg-slate-800/50 border border-slate-700 rounded-lg p-4">
           <h2 className="font-semibold mb-3">Podaj link do playlisty Spotify</h2>
           <PlaylistInput onLoad={loadPlaylist} />
+          <div className="mt-6">
+            <div className="text-sm opacity-70 mb-2">Podgląd przykładowej karty (front i tył):</div>
+            <div className="flex gap-4 justify-center flex-wrap">
+              <div ref={el => (cardFrontRefs.current[sampleSong.id] = el)}>
+                <Card song={sampleSong} theme={theme} face="front" />
+              </div>
+              <div ref={el => (cardBackRefs.current[sampleSong.id] = el)}>
+                <Card song={sampleSong} theme={theme} face="back" />
+              </div>
+            </div>
+          </div>
         </section>
 
-        {songs.length > 0 ? (
+        {songs.length > 0 && (
           <section className="grid md:grid-cols-2 gap-6">
             {songs.map(song => (
               <div key={song.id} className="bg-slate-800/30 border border-slate-700 rounded-lg p-3">
@@ -110,10 +140,6 @@ export default function App() {
                 </div>
               </div>
             ))}
-          </section>
-        ) : (
-          <section className="text-center opacity-60 mt-16">
-            Wczytaj playlistę Spotify, aby wygenerować karty.
           </section>
         )}
       </main>

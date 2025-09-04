@@ -2,9 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fizyczny rozmiar karty do druku */
 :root {
-  --card-w: 86mm;
-  --card-h: 120mm;
+  --card-w: 37mm;  /* 5 kart w rzędzie na A4 */
+  --card-h: 52mm;
 }
 
 @media print {
