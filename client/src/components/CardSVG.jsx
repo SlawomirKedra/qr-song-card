@@ -63,7 +63,7 @@ const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=4 }, r
   const S = availW / cols;
 
   const text = song?.url || `${song?.title||''} - ${song?.artist||''}`;
-  const qr = useMemo(() => makeQRRects(text, S*0.92, 2, 'M'), [text, S]);
+  const qr = useMemo(() => makeQRRects(text, S*0.90, 3, 'M'), [text, S]);
 
   const ctx = useMeasureCanvas();
   const A = song?.artist || 'Artist';
