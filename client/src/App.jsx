@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import PlaylistInput from './components/PlaylistInput.jsx';
 import CardSVG from './components/CardSVG.jsx';
 import jsPDF from 'jspdf';
-import svg2pdf from 'svg2pdf.js';
+import { svg2pdf } from 'svg2pdf.js';
 
 const PAGE_W = 210;
 const PAGE_H = 297;
