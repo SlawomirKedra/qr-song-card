@@ -1,44 +1,33 @@
-import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 
-const mm = (v) => v; // values in mm, used only for clarity
+const PAGE_W = 210;
+const PAGE_H = 297;
 
 const themeDefs = (theme, intensity=50) => {
-  // intensity 0..100 -> opacity/width multipliers
   const op = Math.max(0, Math.min(1, intensity/100));
-  const strong = 0.15 + op*0.35;  // 0.15..0.5
-  const light = 0.05 + op*0.20;   // 0.05..0.25
-  const stroke = 0.2 + op*0.6;    // 0.2..0.8 px
+  const strong = 0.2 + op*0.5;   // 0.2..0.7
+  const light = 0.05 + op*0.25;  // 0.05..0.3
+  const stroke = 0.3 + op*0.8;   // px
 
   switch(theme){
-    case 'bw-dotgrid':
-      return { pattern: 'dotgrid', dotOpacity: strong };
-    case 'bw-halftone':
-      return { pattern: 'halftone', ringOpacity: light, coreOpacity: strong };
-    case 'bw-waveform':
-      return { pattern: 'wave', strokeOpacity: strong, strokeWidth: stroke };
-    case 'bw-ticket':
-      return { pattern: 'ticket', dotOpacity: 0.35 };
-    case 'bw-hatch':
-      return { pattern: 'hatch', strokeOpacity: strong, strokeWidth: stroke };
-    case 'bw-retro':
-      return { pattern: 'retro', strokeOpacity: strong };
-    case 'bw-contrast':
-      return { pattern: null, borderStrong: true };
-    case 'bw-minimal':
-      return { pattern: null, subtle: true };
+    case 'frame-art':        return { kind:'frame-art', stroke, opStrong: strong, opLight: light };
+    case 'brackets':         return { kind:'brackets', stroke: stroke+0.6, opStrong: strong };
+    case 'gradient-fade':    return { kind:'gradient', opLight: light, opStrong: strong };
+    case 'eq-bars':          return { kind:'eq-bars', opStrong: strong };
+    case 'cassette':         return { kind:'cassette', opStrong: strong, opLight: light };
+    case 'bw-contrast':      return { kind:'none', border: 0.7 };
+    case 'bw-minimal':       return { kind:'none', border: 0.3, subtle: true };
     case 'bw-classic':
-    default:
-      return { pattern: null };
+    default:                 return { kind:'none', border: 0.45 };
   }
 };
 
-const CardSVG = forwardRef(function CardSVG({ song, theme='bw-contrast', intensity=50, face='front', columns=5 }, ref) {
-  // Compute physical size based on selected columns for perfect PDF+preview match
-  const margin = 4; // mm outer margin for PDF (reference only)
-  const pageW = 210, pageH = 297;
+const CardSVG = forwardRef(function CardSVG({ song, theme='frame-art', intensity=60, face='front', columns=5 }, ref) {
+  // Physical size based on column count (preview == PDF)
+  const margin = 4; // mm outer margin used by PDF composer; we mirror for preview
   const cols = Number(columns);
-  const availW = pageW - margin * (cols + 1);
+  const availW = PAGE_W - margin * (cols + 1);
   const wmm = availW / cols;
   const aspect = 37/52;
   const hmm = wmm / aspect;
@@ -56,70 +45,85 @@ const CardSVG = forwardRef(function CardSVG({ song, theme='bw-contrast', intensi
 
   const defs = useMemo(() => themeDefs(theme, intensity), [theme, intensity]);
 
-  // build background pattern groups
+  // Helpers to render backgrounds
   const Bg = () => {
-    if (defs.pattern === 'dotgrid') {
-      const dots = [];
-      const step = 2.5; // mm
-      for (let y=step/2; y<hmm; y+=step) {
-        for (let x=step/2; x<wmm; x+=step) {
-          dots.push(<circle key={`${x}-${y}`} cx={x} cy={y} r="0.35" fill="black" opacity={defs.dotOpacity}/>);
-        }
-      }
-      return <g>{dots}</g>;
+    const inset = 1.8;
+    if (defs.kind === 'frame-art') {
+      const r1=3, r2=2;
+      return <g stroke='black' fill='none'>
+        <rect x={inset} y={inset} width={wmm-2*inset} height={hmm-2*inset} rx={r1} ry={r1} strokeOpacity={defs.opStrong} strokeWidth='0.6'/>
+        <rect x={inset+2} y={inset+2} width={wmm-2*(inset+2)} height={hmm-2*(inset+2)} rx={r2} ry={r2} strokeOpacity={defs.opLight} strokeWidth='0.45'/>
+        {/* corner deco */}
+        <g strokeOpacity={defs.opStrong} strokeWidth='0.6'>
+          <path d={`M ${inset+4} ${inset+0.8} h 6`} />
+          <path d={`M ${inset+0.8} ${inset+4} v 6`} />
+          <path d={`M ${wmm-inset-10} ${inset+0.8} h 6`} />
+          <path d={`M ${wmm-inset-0.8} ${inset+4} v 6`} />
+          <path d={`M ${inset+0.8} ${hmm-inset-10} v -6`} />
+          <path d={`M ${inset+4} ${hmm-inset-0.8} h 6`} />
+          <path d={`M ${wmm-inset-0.8} ${hmm-inset-10} v -6`} />
+          <path d={`M ${wmm-inset-10} ${hmm-inset-0.8} h 6`} />
+        </g>
+      </g>;
     }
-    if (defs.pattern === 'halftone') {
-      const cx=wmm/2, cy=hmm/2, R=Math.min(wmm,hmm)*0.48;
-      const rings=[];
-      for(let r=R*0.2;r<=R;r+=R*0.15){
-        rings.push(<circle key={r} cx={cx} cy={cy} r={r} fill="none" stroke="black" strokeOpacity={defs.ringOpacity} strokeWidth="0.2"/>);
+    if (defs.kind === 'brackets') {
+      const l=7; // bracket length
+      return <g stroke='black' strokeWidth={1.2} strokeOpacity={defs.opStrong} fill='none'>
+        {/* four corner L */}
+        <path d={`M ${inset} ${inset+l} V ${inset} H ${inset+l}`} />
+        <path d={`M ${wmm-inset-l} ${inset} H ${wmm-inset} V ${inset+l}`} />
+        <path d={`M ${inset} ${hmm-inset-l} V ${hmm-inset} H ${inset+l}`} />
+        <path d={`M ${wmm-inset-l} ${hmm-inset} H ${wmm-inset} V ${hmm-inset-l}`} />
+      </g>;
+    }
+    if (defs.kind === 'gradient') {
+      return <>
+        <defs>
+          <radialGradient id="fade" cx="50%" cy="50%" r="65%">
+            <stop offset="0%" stopColor="black" stopOpacity={defs.opLight}/>
+            <stop offset="100%" stopColor="black" stopOpacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect x="0" y="0" width={wmm} height={hmm} fill="url(#fade)" />
+      </>;
+    }
+    if (defs.kind === 'eq-bars') {
+      const bars=[];
+      const step = 2.2;
+      for(let x=1; x<wmm-1; x+=step){
+        const h = (Math.sin(x*0.35)+1)/2 * (hmm*0.35) + hmm*0.15;
+        bars.push(<rect key={x} x={x} y={hmm-h} width={step*0.6} height={h} fill="black" opacity={defs.opStrong}/>);
       }
+      return <g>{bars}</g>;
+    }
+    if (defs.kind === 'cassette') {
+      const bandH = hmm*0.18;
       return <g>
-        <circle cx={cx} cy={cy} r={R} fill="none" stroke="black" strokeOpacity={defs.ringOpacity} strokeWidth="0.3"/>
-        <circle cx={cx} cy={cy} r={R*0.05} fill="black" opacity={defs.coreOpacity}/>
-        {rings}
-      </g>;
-    }
-    if (defs.pattern === 'wave') {
-      const path = `M0 ${hmm*0.55}
-        C ${wmm*0.08} ${hmm*0.2}, ${wmm*0.18} ${hmm*0.9}, ${wmm*0.28} ${hmm*0.55}
-        S ${wmm*0.48} ${hmm*0.2}, ${wmm*0.58} ${hmm*0.55}
-        S ${wmm*0.78} ${hmm*0.9}, ${wmm*0.88} ${hmm*0.55}`;
-      return <g fill="none" stroke="black" strokeOpacity={defs.strokeOpacity} strokeWidth={defs.strokeWidth}>
-        <path d={path}/>
-        <path d={path.replaceAll('0.55','0.65')}/>
-      </g>;
-    }
-    if (defs.pattern === 'hatch') {
-      const lines=[];
-      const step=3.5;
-      for(let x=-hmm; x<wmm+hmm; x+=step){
-        lines.push(<line key={x} x1={x} y1={0} x2={x+hmm} y2={hmm} stroke="black" strokeOpacity={defs.strokeOpacity} strokeWidth={defs.strokeWidth}/>);
-      }
-      return <g>{lines}</g>;
-    }
-    if (defs.pattern === 'retro') {
-      const inset = 2; // mm
-      const r = 3; // mm corner radius
-      return <g stroke="black" strokeOpacity={defs.strokeOpacity} fill="none">
-        <rect x={inset} y={inset} width={wmm-2*inset} height={hmm-2*inset} rx={r} ry={r} strokeWidth="0.6"/>
-        <rect x={inset+2} y={inset+2} width={wmm-2*(inset+2)} height={hmm-2*(inset+2)} rx={r} ry={r} strokeWidth="0.4" opacity="0.6"/>
-        <circle cx={inset+4} cy={inset+4} r="1.3" />
-        <circle cx={wmm-inset-4} cy={hmm-inset-4} r="1.3" />
+        <rect x="0" y={hmm*0.1} width={wmm} height={bandH} fill="black" opacity={defs.opLight}/>
+        <rect x="0" y={hmm*0.72} width={wmm} height={bandH} fill="black" opacity={defs.opLight}/>
+        {/* small reels icon */}
+        <g opacity={defs.opStrong}>
+          <circle cx={wmm*0.28} cy={hmm*0.2} r="1.6" fill="white" stroke="black" strokeWidth="0.4"/>
+          <circle cx={wmm*0.72} cy={hmm*0.2} r="1.6" fill="white" stroke="black" strokeWidth="0.4"/>
+          <circle cx={wmm*0.28} cy={hmm*0.2} r="0.5" fill="black"/><circle cx={wmm*0.72} cy={hmm*0.2} r="0.5" fill="black"/>
+        </g>
       </g>;
     }
     return null;
   };
 
-  // text styles
   const fontArtist = 3.6; // mm ~ 10pt
   const fontYear = 8.2;   // mm ~ 22pt
   const fontTitle = 3.2;  // mm ~ 9pt
 
-  // Build content
   const A = song?.artist || 'Wykonawca';
   const Y = song?.year || '1991';
   const T = song?.title || 'Tytuł utworu';
+
+  // QR box: 90% of the smaller card side => duży QR
+  const qrSide = Math.min(wmm, hmm) * 0.9;
+  const qrX = (wmm - qrSide) / 2;
+  const qrY = (hmm - qrSide) / 2;
 
   return (
     <svg ref={ref}
@@ -128,40 +132,19 @@ const CardSVG = forwardRef(function CardSVG({ song, theme='bw-contrast', intensi
       viewBox={`0 0 ${wmm} ${hmm}`}
     >
       {/* border */}
-      <rect x="0.4" y="0.4" width={wmm-0.8} height={hmm-0.8} fill="white" stroke="black" strokeWidth={defs.borderStrong?0.6:0.3} opacity="0.9" />
+      <rect x="0.4" y="0.4" width={wmm-0.8} height={hmm-0.8} fill="white" stroke="black" strokeWidth={defs.border || 0.5} opacity="0.98" />
 
       {face==='back' && (<g>
-        {/* pattern background */}
         <Bg/>
-        {/* inner frame */}
-        <rect x="1.2" y="1.2" width={wmm-2.4} height={hmm-2.4} fill="none" stroke="black" strokeOpacity="0.5" strokeWidth="0.3" rx="2" ry="2"/>
-        {/* ticket perforation */}
-        {defs.pattern==='ticket' && (
-          <g opacity="0.6">
-            <rect x="1.6" y="2" width="0.4" height={hmm-4} fill="url(#dots)"/>
-            <rect x={wmm-2.0} y="2" width="0.4" height={hmm-4} fill="url(#dots)"/>
-            <defs>
-              <pattern id="dots" width="0.6" height="1.2" patternUnits="userSpaceOnUse">
-                <rect width="0.6" height="0.6" fill="black"/>
-                <rect y="0.6" width="0.6" height="0.6" fill="white"/>
-              </pattern>
-            </defs>
-          </g>
-        )}
-
-        {/* artist */}
-        <text x={wmm/2} y={hmm*0.36} fontFamily="Inter, Arial, sans-serif" fontWeight="700" fontSize={fontArtist} textAnchor="middle" fill="black">{A}</text>
-        {/* year */}
-        <text x={wmm/2} y={hmm*0.52} fontFamily="Inter, Arial, sans-serif" fontWeight="800" fontSize={fontYear} textAnchor="middle" fill="black" letterSpacing="0.2">{Y}</text>
-        {/* title */}
-        <text x={wmm/2} y={hmm*0.66} fontFamily="Inter, Arial, sans-serif" fontWeight="500" fontSize={fontTitle} textAnchor="middle" fill="black">{T}</text>
+        {/* central stack */}
+        <text x={wmm/2} y={hmm*0.36} fontFamily="Helvetica" fontWeight="700" fontSize={fontArtist} textAnchor="middle" fill="black">{A}</text>
+        <text x={wmm/2} y={hmm*0.52} fontFamily="Helvetica" fontWeight="800" fontSize={fontYear} textAnchor="middle" fill="black" letterSpacing="0.2">{Y}</text>
+        <text x={wmm/2} y={hmm*0.66} fontFamily="Helvetica" fontWeight="500" fontSize={fontTitle} textAnchor="middle" fill="black">{T}</text>
       </g>)}
 
       {face==='front' && (<g>
-        {/* QR box */}
-        <rect x={(wmm*0.1)} y={(hmm*0.1)} width={wmm*0.8} height={wmm*0.8} fill="white" stroke="black" strokeWidth="0.3" rx="1.2" ry="1.2"/>
-        {/* QR content */}
-        <g transform={`translate(${wmm*0.1+1}, ${hmm*0.1+1}) scale(${(wmm*0.8-2)/100})`} dangerouslySetInnerHTML={{__html: qrSVG}}/>
+        <rect x={qrX} y={qrY} width={qrSide} height={qrSide} fill="white" stroke="black" strokeWidth="0.6" rx="1.2" ry="1.2"/>
+        <g transform={`translate(${qrX+1}, ${qrY+1}) scale(${(qrSide-2)/100})`} dangerouslySetInnerHTML={{__html: qrSVG}}/>
       </g>)}
     </svg>
   );
