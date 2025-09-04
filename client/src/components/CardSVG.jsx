@@ -1,15 +1,14 @@
-import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useMemo, useRef } from 'react';
 import QRCode from 'qrcode';
 
 const PAGE_W = 210;
 const PAGE_H = 297;
 
-// Render QR as native rects based on matrix to guarantee exact fill and identical PDF.
-function makeQRRects(text, sideMm, quietModules=1, ecl='M'){
+function makeQRRects(text, sideMm, quietModules=2, ecl='M'){
   const model = QRCode.create(text, { errorCorrectionLevel: ecl });
   const size = model.modules.size;
   const data = model.modules.data;
-  const usable = size + quietModules*2; // add quiet zone around
+  const usable = size + quietModules*2;
   const moduleMm = sideMm / usable;
   const rects = [];
   for (let y=0; y<size; y++){
@@ -32,7 +31,7 @@ function useMeasureCanvas() {
 function fitLines(ctx, text, basePx, maxWidthPx, maxLines=2, fontWeight='700', fontStyle='normal') {
   let size = basePx;
   const tryWrap = (sz) => {
-    ctx.font = `${fontStyle} ${fontWeight} ${sz}px Helvetica, Arial, sans-serif`;
+    ctx.font = `${fontStyle} ${fontWeight} ${sz}px Roboto, Arial, sans-serif`;
     const words = String(text).split(' ');
     const lines = [];
     let cur = '';
@@ -61,12 +60,12 @@ const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=4 }, r
   const margin = 4;
   const cols = 4;
   const availW = PAGE_W - margin * (cols + 1);
-  const S = availW / cols;   // square side in mm
-
-  const ctx = useMeasureCanvas();
+  const S = availW / cols;
 
   const text = song?.url || `${song?.title||''} - ${song?.artist||''}`;
-  const qr = useMemo(() => makeQRRects(text, S*0.995, 1, 'M'), [text, S]); // almost full side, 1-module quiet
+  const qr = useMemo(() => makeQRRects(text, S*0.92, 2, 'M'), [text, S]);
+
+  const ctx = useMeasureCanvas();
   const A = song?.artist || 'Artist';
   const Y = song?.year || '1991';
   const T = song?.title || 'Song Title';
@@ -82,7 +81,6 @@ const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=4 }, r
   const artistFit = fitLines(ctx, A, baseArtistPx, maxTextWidthPx, 2, '700', 'normal');
   const titleFit  = fitLines(ctx, T, baseTitlePx, maxTextWidthPx, 2, '500', 'italic');
 
-  // vertical anchors with extra spacing so blocks never collide
   const artistBaseY = S * 0.28;
   const yearBaseY   = S * 0.52;
   const titleBaseY  = S * 0.75;
@@ -93,29 +91,20 @@ const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=4 }, r
       {face==='back' && (<g>
         <rect x="1.4" y="1.4" width={S-2.8} height={S-2.8} fill="none" stroke="black" strokeWidth="0.25" opacity="0.35" rx="2" ry="2"/>
         {artistFit.lines.map((line, i) => (
-          <text key={'a'+i}
-            x={S/2} y={artistBaseY + i * (artistFit.size/pxPerMm * 1.15)}
-            fontFamily="Helvetica, Arial, sans-serif" fontWeight="700" fontSize={artistFit.size/pxPerMm}
-            textAnchor="middle" fill="black">{line}</text>
+          <text key={'a'+i} x={S/2} y={artistBaseY + i * (artistFit.size/pxPerMm * 1.15)}
+            fontFamily="Roboto" fontWeight="700" fontSize={artistFit.size/pxPerMm} textAnchor="middle" fill="black">{line}</text>
         ))}
-        <text x={S/2} y={yearBaseY} fontFamily="Helvetica, Arial, sans-serif" fontWeight="800"
-          fontSize={Math.min(baseYearPx, (S*0.56*pxPerMm)) / pxPerMm}
-          textAnchor="middle" fill="black" letterSpacing="0.2">{Y}</text>
+        <text x={S/2} y={yearBaseY} fontFamily="Roboto" fontWeight="800"
+          fontSize={Math.min(baseYearPx, (S*0.56*pxPerMm)) / pxPerMm} textAnchor="middle" fill="black" letterSpacing="0.2">{Y}</text>
         {titleFit.lines.map((line, i) => (
-          <text key={'t'+i}
-            x={S/2} y={titleBaseY + i * (titleFit.size/pxPerMm * 1.2)}
-            fontFamily="Helvetica, Arial, sans-serif" fontStyle="italic" fontWeight="500" fontSize={titleFit.size/pxPerMm}
-            textAnchor="middle" fill="black">{line}</text>
+          <text key={'t'+i} x={S/2} y={titleBaseY + i * (titleFit.size/pxPerMm * 1.2)}
+            fontFamily="Roboto" fontStyle="italic" fontWeight="500" fontSize={titleFit.size/pxPerMm} textAnchor="middle" fill="black">{line}</text>
         ))}
       </g>)}
       {face==='front' && (<g>
-        {/* QR as rects */}
         <g transform={`translate(${(S - qr.sideWithQuiet)/2}, ${(S - qr.sideWithQuiet)/2})`}>
-          {qr.rects.map((r, i) => (
-            <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} fill="black" />
-          ))}
+          {qr.rects.map((r, i) => (<rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} fill="black" />))}
         </g>
-        {/* rounded frame over QR */}
         <rect x="0.5" y="0.5" width={S-1} height={S-1} rx="2" ry="2" fill="none" stroke="black" strokeWidth="0.6"/>
       </g>)}
     </svg>
