@@ -19,7 +19,7 @@ function withIds(tracks){ return tracks.map(t => ({ ...t, id: Math.random().toSt
 
 export default function App() {
   const [songs, setSongs] = useState([]);
-  const [columns, setColumns] = useState(5);
+  const [columns] = useState(4);
   const [guides, setGuides] = useState(true);
 
   const svgRefsFront = useRef({});
@@ -107,7 +107,7 @@ export default function App() {
   <div className="container toolbar">
     <div className="title">QR Song Cards</div>
     <div className="spacer"></div>
-    <label className="subtle" style={{ margin: 0 }}>Kolumny:</label>
+    <label className="subtle" style={{margin:0}}>Kolumny:</label>
     <select value={columns} onChange={(e)=>setColumns(Number(e.target.value))} className="select">
       <option value="5">5</option>
       <option value="4">4</option>
