@@ -1,6 +1,4 @@
 // client/src/lib/roboto.js
-// Rejestruje Roboto w jsPDF z LOKALNYCH plików w public/ (bez CDN, bez node_modules).
-
 async function urlToBase64(url) {
   const r = await fetch(url);
   if (!r.ok) throw new Error('Font fetch failed: ' + url);
