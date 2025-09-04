@@ -1,13 +1,7 @@
-// client/src/lib/roboto.js
-// Rejestruje Roboto w jsPDF z lokalnych plików z paczki "typeface-roboto".
-// ZERO zewnętrznych URL-i => brak 404/CORS.
-
-import robotoRegularUrl from 'typeface-roboto/files/roboto-latin-400.ttf?url';
-import robotoBoldUrl    from 'typeface-roboto/files/roboto-latin-700.ttf?url';
-import robotoItalicUrl  from 'typeface-roboto/files/roboto-latin-400-italic.ttf?url';
-
+// Rejestruje Roboto w jsPDF z LOKALNYCH plików w public/ (bez CDN).
 async function urlToBase64(url) {
-  const r = await fetch(url);              // ten URL jest z tej samej domeny (dist), więc CORS ok
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Font fetch failed: ' + url);
   const buf = await r.arrayBuffer();
   let binary = '';
   const bytes = new Uint8Array(buf);
@@ -19,12 +13,14 @@ async function urlToBase64(url) {
 }
 
 export async function ensureRobotoForPDF(doc) {
-  if (doc.getFontList?.().Roboto) return;  // już dodane
+  // jeśli już dodane – wyjdź
+  const list = doc.getFontList?.() || {};
+  if (list['Roboto']) return;
 
   const [reg, bold, italic] = await Promise.all([
-    urlToBase64(robotoRegularUrl),
-    urlToBase64(robotoBoldUrl),
-    urlToBase64(robotoItalicUrl),
+    urlToBase64('/fonts/roboto/Roboto-Regular.ttf'),
+    urlToBase64('/fonts/roboto/Roboto-Bold.ttf'),
+    urlToBase64('/fonts/roboto/Roboto-Italic.ttf'),
   ]);
 
   doc.addFileToVFS('Roboto-Regular.ttf', reg);
