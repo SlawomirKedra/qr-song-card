@@ -97,6 +97,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.resolve(__dirname, '../client/dist');
 
+const fontsDir = path.resolve(__dirname, '../client/public/fonts');
+app.use('/fonts', express.static(fontsDir, { maxAge: '365d', immutable: true }));
+
 app.use(express.static(distPath));
 
 app.get('*', (req, res) => {
