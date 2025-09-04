@@ -107,7 +107,7 @@ export default function App() {
   <div className="container toolbar">
     <div className="title">QR Song Cards</div>
     <div className="spacer"></div>
-    <label className="subtle" style="margin:0">Kolumny:</label>
+    <label className="subtle" style={{ margin: 0 }}>Kolumny:</label>
     <select value={columns} onChange={(e)=>setColumns(Number(e.target.value))} className="select">
       <option value="5">5</option>
       <option value="4">4</option>
