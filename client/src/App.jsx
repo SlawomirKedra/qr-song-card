@@ -44,7 +44,7 @@ export default function App() {
   const exportPDF = async (face) => {
     const refs = face === 'front' ? cardFrontRefs.current : cardBackRefs.current;
     const images = [];
-    const items = songs.length ? songs : [sampleSong]; // jeżeli ktoś nie wczytał, pozwól 1 podgląd
+    const items = songs.length ? songs : [sampleSong];
     for (const song of items) {
       const el = refs[song.id];
       if (!el) continue;
@@ -55,8 +55,8 @@ export default function App() {
 
     const margin = 4;           // mm
     const cols = 5;
-    const aspect = CARD_W_MM / CARD_H_MM;
     const rows = Math.max(1, Math.floor((PAGE_H - margin) / (CARD_H_MM + margin))); // zwykle 5
+    const aspect = CARD_W_MM / CARD_H_MM;
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const cellW = (PAGE_W - margin * (cols + 1)) / cols;
@@ -95,6 +95,10 @@ export default function App() {
               <option value="bw-classic">Motyw: BW Classic</option>
               <option value="bw-minimal">Motyw: BW Minimal</option>
               <option value="bw-contrast">Motyw: BW Contrast</option>
+              <option value="bw-dotgrid">Motyw: BW DotGrid</option>
+              <option value="bw-halftone">Motyw: BW Halftone (Vinyl)</option>
+              <option value="bw-ticket">Motyw: BW Ticket (Perforation)</option>
+              <option value="bw-waveform">Motyw: BW Waveform</option>
               <option value="light">Motyw: Jasny</option>
               <option value="dark">Motyw: Ciemny</option>
             </select>
@@ -115,10 +119,10 @@ export default function App() {
           <div className="mt-6">
             <div className="text-sm opacity-70 mb-2">Podgląd przykładowej karty (front i tył):</div>
             <div className="flex gap-4 justify-center flex-wrap">
-              <div ref={el => (cardFrontRefs.current[sampleSong.id] = el)}>
+              <div ref={el => (cardFrontRefs.current['sample'] = el)}>
                 <Card song={sampleSong} theme={theme} face="front" />
               </div>
-              <div ref={el => (cardBackRefs.current[sampleSong.id] = el)}>
+              <div ref={el => (cardBackRefs.current['sample'] = el)}>
                 <Card song={sampleSong} theme={theme} face="back" />
               </div>
             </div>
