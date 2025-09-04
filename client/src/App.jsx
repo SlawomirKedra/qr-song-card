@@ -1,11 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
 import PlaylistInput from './components/PlaylistInput.jsx';
-import Card from './components/Card.jsx';
-import html2canvas from 'html2canvas';
+import CardSVG from './components/CardSVG.jsx';
 import jsPDF from 'jspdf';
+import svg2pdf from 'svg2pdf.js';
 
-const CARD_W_MM = 37;
-const CARD_H_MM = 52;
 const PAGE_W = 210;
 const PAGE_H = 297;
 
@@ -24,10 +22,12 @@ function withIds(tracks){
 
 export default function App() {
   const [songs, setSongs] = useState([]);
-  const [theme, setTheme] = useState('bw-classic'); // default B/W
-  const cardFrontRefs = useRef({});
-  const cardBackRefs = useRef({});
+  const [theme, setTheme] = useState('bw-contrast');
+  const [intensity, setIntensity] = useState(50); // 0-100
+  const [columns, setColumns] = useState(5); // 4 or 5
 
+  const svgRefsFront = useRef({});
+  const svgRefsBack = useRef({});
   const apiBase = useMemo(() => (window.__API_BASE__ || ''), []);
 
   const loadPlaylist = async (playlistUrl) => {
@@ -41,73 +41,76 @@ export default function App() {
     setSongs(withIds(data.tracks || []));
   };
 
+  const getCardSizeMM = () => {
+    const margin = 4;
+    const cols = Number(columns);
+    const availW = PAGE_W - margin * (cols + 1);
+    const w = availW / cols;       // mm per card
+    const aspect = 37/52;
+    const h = w / aspect;
+    return { w, h, margin, cols };
+  };
+
   const exportPDF = async (face) => {
-    const refs = face === 'front' ? cardFrontRefs.current : cardBackRefs.current;
-    const images = [];
     const items = songs.length ? songs : [sampleSong];
-    for (const song of items) {
-      const el = refs[song.id];
-      if (!el) continue;
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff' });
-      images.push(canvas.toDataURL('image/png'));
-    }
-    if (!images.length) return;
-
-    const margin = 4;           // mm
-    const cols = 5;
-    const rows = Math.max(1, Math.floor((PAGE_H - margin) / (CARD_H_MM + margin))); // zwykle 5
-    const aspect = CARD_W_MM / CARD_H_MM;
-
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const cellW = (PAGE_W - margin * (cols + 1)) / cols;
-    const cellH = (PAGE_H - margin * (rows + 1)) / rows;
-
-    const imgW = Math.min(cellW, cellH * aspect);
-    const imgH = imgW / aspect;
+    const { w, h, margin, cols } = getCardSizeMM();
+    const rows = Math.max(1, Math.floor((PAGE_H - margin) / (h + margin)));
 
     let i = 0;
-    for (const img of images) {
+    for (const song of items) {
+      const refMap = face === 'front' ? svgRefsFront.current : svgRefsBack.current;
+      const svg = refMap[song.id];
+      if (!svg) continue;
+
       const col = i % cols;
       const row = Math.floor(i / cols) % rows;
       if (i !== 0 && col === 0 && row === 0) doc.addPage();
 
-      const x = margin + col * (cellW + margin) + (cellW - imgW) / 2;
-      const y = margin + row * (cellH + margin) + (cellH - imgH) / 2;
+      const x = margin + col * (w + margin);
+      const y = margin + row * (h + margin);
 
-      doc.addImage(img, 'PNG', x, y, imgW, imgH);
+      await svg2pdf(svg, doc, { x, y, width: w, height: h });
       i++;
     }
 
-    doc.save(`qr-song-cards-${face}.pdf`);
+    doc.save(`qr-song-cards-${face}-${cols}col.pdf`);
   };
 
   return (
     <div className="min-h-screen">
       <header className="no-print sticky top-0 z-20 bg-slate-900/80 backdrop-blur border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
           <div className="text-xl font-bold tracking-tight">QR Song Cards</div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <label className="text-sm opacity-80">Motyw:</label>
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
               className="bg-slate-800 border border-slate-700 rounded px-3 py-2"
             >
-              <option value="bw-classic">Motyw: BW Classic</option>
-              <option value="bw-minimal">Motyw: BW Minimal</option>
-              <option value="bw-contrast">Motyw: BW Contrast</option>
-              <option value="bw-dotgrid">Motyw: BW DotGrid</option>
-              <option value="bw-halftone">Motyw: BW Halftone (Vinyl)</option>
-              <option value="bw-ticket">Motyw: BW Ticket (Perforation)</option>
-              <option value="bw-waveform">Motyw: BW Waveform</option>
-              <option value="light">Motyw: Jasny</option>
-              <option value="dark">Motyw: Ciemny</option>
+              <option value="bw-classic">BW Classic</option>
+              <option value="bw-minimal">BW Minimal</option>
+              <option value="bw-contrast">BW Contrast</option>
+              <option value="bw-dotgrid">BW DotGrid</option>
+              <option value="bw-halftone">BW Halftone (Vinyl)</option>
+              <option value="bw-waveform">BW Waveform</option>
+              <option value="bw-ticket">BW Ticket (Perforation)</option>
+              <option value="bw-hatch">BW Hatch (Diagonal)</option>
+              <option value="bw-retro">BW Retro Corners</option>
             </select>
-            <button onClick={() => exportPDF('front')} className="px-3 py-2 rounded bg-emerald-500 hover:bg-emerald-600 text-white">
-              PDF: Fronty (QR)
-            </button>
-            <button onClick={() => exportPDF('back')} className="px-3 py-2 rounded bg-sky-500 hover:bg-sky-600 text-white">
-              PDF: Tyły (opis)
-            </button>
+
+            <label className="text-sm opacity-80">Intensywność:</label>
+            <input type="range" min="0" max="100" value={intensity} onChange={(e)=>setIntensity(Number(e.target.value))} />
+
+            <label className="text-sm opacity-80">Kolumny:</label>
+            <select value={columns} onChange={(e)=>setColumns(Number(e.target.value))} className="bg-slate-800 border border-slate-700 rounded px-3 py-2">
+              <option value="5">5</option>
+              <option value="4">4</option>
+            </select>
+
+            <button onClick={() => exportPDF('front')} className="px-3 py-2 rounded bg-emerald-500 hover:bg-emerald-600 text-white">PDF: Fronty</button>
+            <button onClick={() => exportPDF('back')} className="px-3 py-2 rounded bg-sky-500 hover:bg-sky-600 text-white">PDF: Tyły</button>
           </div>
         </div>
       </header>
@@ -117,14 +120,10 @@ export default function App() {
           <h2 className="font-semibold mb-3">Podaj link do playlisty Spotify</h2>
           <PlaylistInput onLoad={loadPlaylist} />
           <div className="mt-6">
-            <div className="text-sm opacity-70 mb-2">Podgląd przykładowej karty (front i tył):</div>
+            <div className="text-sm opacity-70 mb-2">Podgląd przykładowej karty (front i tył) w wybranym motywie:</div>
             <div className="flex gap-4 justify-center flex-wrap">
-              <div ref={el => (cardFrontRefs.current['sample'] = el)}>
-                <Card song={sampleSong} theme={theme} face="front" />
-              </div>
-              <div ref={el => (cardBackRefs.current['sample'] = el)}>
-                <Card song={sampleSong} theme={theme} face="back" />
-              </div>
+              <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current['sample']=el; }}} song={sampleSong} theme={theme} intensity={intensity} face="front" columns={columns} />
+              <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current['sample']=el; }}} song={sampleSong} theme={theme} intensity={intensity} face="back" columns={columns} />
             </div>
           </div>
         </section>
@@ -135,12 +134,8 @@ export default function App() {
               <div key={song.id} className="bg-slate-800/30 border border-slate-700 rounded-lg p-3">
                 <div className="text-sm opacity-70 mb-2">Podgląd (front i tył)</div>
                 <div className="flex gap-4 justify-center flex-wrap">
-                  <div ref={el => (cardFrontRefs.current[song.id] = el)}>
-                    <Card song={song} theme={theme} face="front" />
-                  </div>
-                  <div ref={el => (cardBackRefs.current[song.id] = el)}>
-                    <Card song={song} theme={theme} face="back" />
-                  </div>
+                  <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current[song.id]=el; }}} song={song} theme={theme} intensity={intensity} face="front" columns={columns} />
+                  <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current[song.id]=el; }}} song={song} theme={theme} intensity={intensity} face="back" columns={columns} />
                 </div>
               </div>
             ))}
