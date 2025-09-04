@@ -49,19 +49,16 @@ export default function App() {
     doc.setLineWidth(0.1);
     doc.setLineDash([1, 1], 0);
 
-    // Vertical guide lines (gutter centers + outer)
     const vXs = [outer.x];
     for (let c=1; c<cols; c++) vXs.push(margin/2 + c*(w+margin));
     vXs.push(PAGE_W - margin/2);
     for (const x of vXs) doc.line(x, outer.y, x, outer.y + outer.h);
 
-    // Horizontal guide lines
     const hYs = [outer.y];
     for (let r=1; r<rows; r++) hYs.push(margin/2 + r*(h+margin));
     hYs.push(PAGE_H - margin/2);
     for (const y of hYs) doc.line(outer.x, y, outer.x + outer.w, y);
 
-    // Crop marks (ticks)
     doc.setLineDash();
     const tick = 3;
     for (const x of vXs) {
@@ -105,51 +102,54 @@ export default function App() {
 
   return (
     <div style={{minHeight:'100vh'}}>
-      <header style={{position:'sticky',top:0,zIndex:20,background:'rgba(15,23,42,.85)',backdropFilter:'blur(6px)',borderBottom:'1px solid #1e293b'}}>
-        <div style={{maxWidth:960,margin:'0 auto',padding:'12px 16px',display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
-          <div style={{fontWeight:800,fontSize:18}}>QR Song Cards</div>
-          <div style={{marginLeft:'auto',display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
-            <label style={{opacity:.85,fontSize:14}}>Kolumny:</label>
-            <select value={columns} onChange={(e)=>setColumns(Number(e.target.value))} style={{background:'#0b1220',border:'1px solid #334155',borderRadius:8,padding:'8px 10px',color:'#e2e8f0'}}>
-              <option value="5">5</option>
-              <option value="4">4</option>
-            </select>
-            <label style={{display:'flex',alignItems:'center',gap:6,opacity:.85,fontSize:14}}>
-              <input type="checkbox" checked={guides} onChange={(e)=>setGuides(e.target.checked)} /> Linie cięcia
-            </label>
-            <button onClick={() => exportPDF('front')} style={{padding:'8px 10px',borderRadius:8,background:'#10b981',color:'#fff',border:'0'}}>PDF: Fronty</button>
-            <button onClick={() => exportPDF('back')} style={{padding:'8px 10px',borderRadius:8,background:'#0ea5e9',color:'#fff',border:'0'}}>PDF: Tyły</button>
+      
+<header className="header">
+  <div className="container toolbar">
+    <div className="title">QR Song Cards</div>
+    <div className="spacer"></div>
+    <label className="subtle" style="margin:0">Kolumny:</label>
+    <select value={columns} onChange={(e)=>setColumns(Number(e.target.value))} className="select">
+      <option value="5">5</option>
+      <option value="4">4</option>
+    </select>
+    <label className="checkbox">
+      <input type="checkbox" checked={guides} onChange={(e)=>setGuides(e.target.checked)} /> Linie cięcia
+    </label>
+    <button onClick={() => exportPDF('front')} className="btn btn-green">PDF: Fronty</button>
+    <button onClick={() => exportPDF('back')} className="btn btn-blue">PDF: Tyły</button>
+  </div>
+</header>
+
+
+      
+<main className="main">
+  <section className="panel">
+    <h2 className="h2">Podaj link do playlisty Spotify</h2>
+    <PlaylistInput onLoad={loadPlaylist} />
+    <div style={{marginTop:16}}>
+      <div className="subtle">Podgląd przykładowej karty (front i tył):</div>
+      <div className="preview">
+        <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current['sample']=el; }}} song={sampleSong} face="front" columns={columns} />
+        <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current['sample']=el; }}} song={sampleSong} face="back" columns={columns} />
+      </div>
+    </div>
+  </section>
+
+  {songs.length > 0 && (
+    <section className="grid">
+      {songs.map(song => (
+        <div key={song.id} className="card">
+          <div className="subtle">Podgląd (front i tył)</div>
+          <div className="preview">
+            <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current[song.id]=el; }}} song={song} face="front" columns={columns} />
+            <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current[song.id]=el; }}} song={song} face="back" columns={columns} />
           </div>
         </div>
-      </header>
+      ))}
+    </section>
+  )}
+</main>
 
-      <main style={{maxWidth:960,margin:'0 auto',padding:'0 16px 80px'}}>
-        <section style={{margin:'24px 0',background:'rgba(30,41,59,.5)',border:'1px solid #334155',borderRadius:12,padding:16}}>
-          <h2 style={{fontWeight:600,margin:'4px 0 12px'}}>Podaj link do playlisty Spotify</h2>
-          <PlaylistInput onLoad={loadPlaylist} />
-          <div style={{marginTop:16}}>
-            <div style={{opacity:.7,fontSize:14,marginBottom:8}}>Podgląd przykładowej karty (front i tył):</div>
-            <div style={{display:'flex',gap:16,justifyContent:'center',flexWrap:'wrap'}}>
-              <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current['sample']=el; }}} song={sampleSong} face="front" columns={columns} />
-              <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current['sample']=el; }}} song={sampleSong} face="back" columns={columns} />
-            </div>
-          </div>
-        </section>
-
-        {songs.length > 0 && (
-          <section style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:24}}>
-            {songs.map(song => (
-              <div key={song.id} style={{background:'rgba(30,41,59,.4)',border:'1px solid #334155',borderRadius:12,padding:12}}>
-                <div style={{opacity:.7,fontSize:14,marginBottom:8}}>Podgląd (front i tył)</div>
-                <div style={{display:'flex',gap:16,justifyContent:'center',flexWrap:'wrap'}}>
-                  <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current[song.id]=el; }}} song={song} face="front" columns={columns} />
-                  <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current[song.id]=el; }}} song={song} face="back" columns={columns} />
-                </div>
-              </div>
-            ))}
-          </section>
-        )}
-      </main>
     </div>
   );
 }
