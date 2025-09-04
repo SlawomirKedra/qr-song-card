@@ -1,70 +1,30 @@
-# QR Song Cards
+# QR Song Cards (v2)
 
-Prosta aplikacja webowa (React + Vite + Tailwind + Express), która umożliwia tworzenie i drukowanie kart z kodami QR do piosenek — w stylu QRSong.
+Zmiany:
+- Karta **dwustronna**: front = sam QR, back = wykonawca/tytuł/rok + miniatura.
+- **Import z playlisty Spotify** — podaj link do playlisty, reszta zaciąga się automatycznie z API.
+- Eksport PDF oddzielnie: **Fronty** i **Tyły** (do druku dwustronnego).
 
-## Funkcje
-- Dodawanie wielu utworów (tytuł, wykonawca, rok, URL).
-- Automatyczne generowanie QR (z URL).
-- Opcjonalne pobranie miniatury i tytułu przez **oEmbed** (YouTube/Spotify/SoundCloud) via backend `/api/oembed`.
-- Podgląd kart w siatce + tryb wydruku.
-- Eksport **PDF** (A4, siatka 3×2) i **PNG** każdej karty.
-- 3 motywy kart (Jasny, Ciemny, Neon).
-- Jeden repozytorium: frontend + backend. W produkcji Express serwuje build Reacta.
-
-## Szybki start (lokalnie)
-Wymagany **Node 18+**.
-
+## Start
 ```bash
-# 1) Rozpakuj projekt i wejdź do katalogu
-cd qr-song-cards
-
-# 2) Zainstaluj zależności
 npm install
-
-# 3) Tryb developerski (frontend + backend równolegle)
 npm run dev
-# Frontend: http://localhost:5173
-# Backend API: http://localhost:8080
-
-# 4) Build produkcyjny i uruchomienie jednego serwera (Express + statyczny frontend)
+# front: http://localhost:5173, api: http://localhost:8080
+```
+Produkcja (jeden serwer Express):
+```bash
 npm run build && npm start
-# Aplikacja: http://localhost:8080
+# http://localhost:8080
 ```
 
-## Deploy jako jeden serwis (np. Render)
-1. Wgraj repo do GitHub.
-2. Na Render utwórz **Web Service** z tego repo.
-3. Ustaw:
-   - **Build Command:** `npm run build`
-   - **Start Command:** `npm start`
-   - **Region/Node:** dowolne, Node 18+.
-4. Po deployu otrzymasz jeden URL (np. `https://twoja-apka.onrender.com/`) — API i frontend będą pod tym samym hostem.
+## Konfiguracja Spotify (backend)
+Dodaj zmienne środowiskowe (Render → Settings → Environment):
+- `SPOTIFY_CLIENT_ID`
+- `SPOTIFY_CLIENT_SECRET`
 
-> Alternatywnie: backend na Render (Web Service), frontend na Netlify/Vercel (statyczny build z `client/dist`) i ustaw w `VITE_API_BASE` adres API.
+Back-end korzysta z **Client Credentials Flow**, więc wystarczą te 2 wartości, by pobrać publiczne playlisty.
 
-## Zmienne środowiskowe (opcjonalne)
-- `VITE_API_BASE` (frontend) – nadpisuje bazowy URL API w produkcji (gdy frontend nie jest serwowany przez Express).
-
-## Struktura
-```
-qr-song-cards/
-├─ client/           # React + Vite + Tailwind
-│  ├─ src/
-│  │  ├─ components/
-│  │  ├─ utils/
-│  │  ├─ App.jsx
-│  │  └─ main.jsx
-│  ├─ index.html
-│  ├─ tailwind.config.cjs
-│  ├─ postcss.config.cjs
-│  ├─ vite.config.js
-│  └─ package.json
-├─ server/           # Express API + serwowanie builda
-│  ├─ index.js
-│  └─ package.json
-├─ package.json      # skrypty monorepo
-└─ README.md
-```
-
-## Licencja
-MIT
+## Deploy na Render (1 serwis)
+- Build Command: `npm install && npm run build`
+- Start Command: `npm start`
+- Env: `NODE_VERSION=20` (lub 22), `NPM_CONFIG_PRODUCTION=false`, `SPOTIFY_CLIENT_ID/SECRET`
