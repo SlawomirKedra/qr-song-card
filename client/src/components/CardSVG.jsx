@@ -94,7 +94,7 @@ const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=4 }, r
           <text key={'a'+i} x={S/2} y={artistBaseY + i * (artistFit.size/pxPerMm * 1.15)}
             fontFamily="Roboto" fontWeight="700" fontSize={artistFit.size/pxPerMm} textAnchor="middle" fill="black">{line}</text>
         ))}
-        <text x={S/2} y={yearBaseY} fontFamily="Roboto" fontWeight="800"
+        <text x={S/2} y={yearBaseY} fontFamily="Roboto" fontWeight="700"
           fontSize={Math.min(baseYearPx, (S*0.56*pxPerMm)) / pxPerMm} textAnchor="middle" fill="black" letterSpacing="0.2">{Y}</text>
         {titleFit.lines.map((line, i) => (
           <text key={'t'+i} x={S/2} y={titleBaseY + i * (titleFit.size/pxPerMm * 1.2)}
