@@ -9,22 +9,18 @@ const PAGE_H = 297;
 
 const sampleSong = {
   id: 'sample',
-  title: 'Smells Like Teen Spirit',
-  artist: 'Nirvana',
-  year: '1991',
-  url: 'https://open.spotify.com/track/5ghIJDpPoe3CfHMGu71E6T',
-  cover: ''
+  title: 'Smooth Operator',
+  artist: 'Sade',
+  year: '1984',
+  url: 'https://open.spotify.com/track/4Tyv7X6Y2P2fN0v9omwCWo'
 };
 
-function withIds(tracks){
-  return tracks.map(t => ({ ...t, id: Math.random().toString(36).slice(2) }));
-}
+function withIds(tracks){ return tracks.map(t => ({ ...t, id: Math.random().toString(36).slice(2) })); }
 
 export default function App() {
   const [songs, setSongs] = useState([]);
-  const [theme, setTheme] = useState('bw-contrast');
-  const [intensity, setIntensity] = useState(50); // 0-100
-  const [columns, setColumns] = useState(5); // 4 or 5
+  const [columns, setColumns] = useState(5);
+  const [guides, setGuides] = useState(true);
 
   const svgRefsFront = useRef({});
   const svgRefsBack = useRef({});
@@ -32,11 +28,7 @@ export default function App() {
 
   const loadPlaylist = async (playlistUrl) => {
     const r = await fetch(`${apiBase}/api/spotify/playlist?url=${encodeURIComponent(playlistUrl)}`);
-    if (!r.ok) {
-      const e = await r.json().catch(()=>({error:'Błąd'}));
-      alert('Nie udało się załadować playlisty: ' + (e.error || r.status));
-      return;
-    }
+    if (!r.ok) { alert('Nie udało się załadować playlisty'); return; }
     const data = await r.json();
     setSongs(withIds(data.tracks || []));
   };
@@ -45,19 +37,50 @@ export default function App() {
     const margin = 4;
     const cols = Number(columns);
     const availW = PAGE_W - margin * (cols + 1);
-    const w = availW / cols;       // mm per card
-    const aspect = 37/52;
-    const h = w / aspect;
-    return { w, h, margin, cols };
+    const w = availW / cols; // square
+    const h = w;
+    const rows = Math.max(1, Math.floor((PAGE_H - margin) / (h + margin)));
+    return { w, h, margin, cols, rows };
+  };
+
+  const drawGuides = (doc, margin, cols, rows, w, h) => {
+    const outer = { x: margin/2, y: margin/2, w: PAGE_W - margin, h: PAGE_H - margin };
+    doc.setDrawColor(150);
+    doc.setLineWidth(0.1);
+    doc.setLineDash([1, 1], 0);
+
+    // Vertical guide lines (gutter centers + outer)
+    const vXs = [outer.x];
+    for (let c=1; c<cols; c++) vXs.push(margin/2 + c*(w+margin));
+    vXs.push(PAGE_W - margin/2);
+    for (const x of vXs) doc.line(x, outer.y, x, outer.y + outer.h);
+
+    // Horizontal guide lines
+    const hYs = [outer.y];
+    for (let r=1; r<rows; r++) hYs.push(margin/2 + r*(h+margin));
+    hYs.push(PAGE_H - margin/2);
+    for (const y of hYs) doc.line(outer.x, y, outer.x + outer.w, y);
+
+    // Crop marks (ticks)
+    doc.setLineDash();
+    const tick = 3;
+    for (const x of vXs) {
+      doc.line(x, outer.y - 0.01, x, outer.y - tick);
+      doc.line(x, outer.y + outer.h + 0.01, x, outer.y + outer.h + tick);
+    }
+    for (const y of hYs) {
+      doc.line(outer.x - 0.01, y, outer.x - tick, y);
+      doc.line(outer.x + outer.w + 0.01, y, outer.x + outer.w + tick, y);
+    }
   };
 
   const exportPDF = async (face) => {
     const items = songs.length ? songs : [sampleSong];
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const { w, h, margin, cols } = getCardSizeMM();
-    const rows = Math.max(1, Math.floor((PAGE_H - margin) / (h + margin)));
+    const { w, h, margin, cols, rows } = getCardSizeMM();
 
     let i = 0;
+    const perPage = rows * cols;
     for (const song of items) {
       const refMap = face === 'front' ? svgRefsFront.current : svgRefsBack.current;
       const svg = refMap[song.id];
@@ -71,70 +94,56 @@ export default function App() {
       const y = margin + row * (h + margin);
 
       await svg2pdf(svg, doc, { x, y, width: w, height: h });
+
       i++;
+      const endOfPage = (i % perPage === 0) || (i === items.length);
+      if (guides && endOfPage) drawGuides(doc, margin, cols, rows, w, h);
     }
 
-    doc.save(`qr-song-cards-${face}-${cols}col.pdf`);
+    doc.save(`qr-song-cards-${face}-${columns}col-square.pdf`);
   };
 
   return (
-    <div className="min-h-screen">
-      <header className="no-print sticky top-0 z-20 bg-slate-900/80 backdrop-blur border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
-          <div className="text-xl font-bold tracking-tight">QR Song Cards</div>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <label className="text-sm opacity-80">Motyw:</label>
-            <select
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              className="bg-slate-800 border border-slate-700 rounded px-3 py-2"
-            >
-              <option value="frame-art">Frame Art</option>
-              <option value="brackets">Corner Brackets</option>
-              <option value="gradient-fade">Gradient Fade</option>
-              <option value="eq-bars">EQ Bars</option>
-              <option value="cassette">Cassette Label</option>
-              <option value="bw-contrast">BW Contrast</option>
-              <option value="bw-classic">BW Classic</option>
-              <option value="bw-minimal">BW Minimal</option>
-            </select>
-
-            <label className="text-sm opacity-80">Intensywność:</label>
-            <input type="range" min="0" max="100" value={intensity} onChange={(e)=>setIntensity(Number(e.target.value))} />
-
-            <label className="text-sm opacity-80">Kolumny:</label>
-            <select value={columns} onChange={(e)=>setColumns(Number(e.target.value))} className="bg-slate-800 border border-slate-700 rounded px-3 py-2">
+    <div style={{minHeight:'100vh'}}>
+      <header style={{position:'sticky',top:0,zIndex:20,background:'rgba(15,23,42,.85)',backdropFilter:'blur(6px)',borderBottom:'1px solid #1e293b'}}>
+        <div style={{maxWidth:960,margin:'0 auto',padding:'12px 16px',display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{fontWeight:800,fontSize:18}}>QR Song Cards</div>
+          <div style={{marginLeft:'auto',display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+            <label style={{opacity:.85,fontSize:14}}>Kolumny:</label>
+            <select value={columns} onChange={(e)=>setColumns(Number(e.target.value))} style={{background:'#0b1220',border:'1px solid #334155',borderRadius:8,padding:'8px 10px',color:'#e2e8f0'}}>
               <option value="5">5</option>
               <option value="4">4</option>
             </select>
-
-            <button onClick={() => exportPDF('front')} className="px-3 py-2 rounded bg-emerald-500 hover:bg-emerald-600 text-white">PDF: Fronty</button>
-            <button onClick={() => exportPDF('back')} className="px-3 py-2 rounded bg-sky-500 hover:bg-sky-600 text-white">PDF: Tyły</button>
+            <label style={{display:'flex',alignItems:'center',gap:6,opacity:.85,fontSize:14}}>
+              <input type="checkbox" checked={guides} onChange={(e)=>setGuides(e.target.checked)} /> Linie cięcia
+            </label>
+            <button onClick={() => exportPDF('front')} style={{padding:'8px 10px',borderRadius:8,background:'#10b981',color:'#fff',border:'0'}}>PDF: Fronty</button>
+            <button onClick={() => exportPDF('back')} style={{padding:'8px 10px',borderRadius:8,background:'#0ea5e9',color:'#fff',border:'0'}}>PDF: Tyły</button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 pb-24">
-        <section className="no-print my-6 bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-          <h2 className="font-semibold mb-3">Podaj link do playlisty Spotify</h2>
+      <main style={{maxWidth:960,margin:'0 auto',padding:'0 16px 80px'}}>
+        <section style={{margin:'24px 0',background:'rgba(30,41,59,.5)',border:'1px solid #334155',borderRadius:12,padding:16}}>
+          <h2 style={{fontWeight:600,margin:'4px 0 12px'}}>Podaj link do playlisty Spotify</h2>
           <PlaylistInput onLoad={loadPlaylist} />
-          <div className="mt-6">
-            <div className="text-sm opacity-70 mb-2">Podgląd przykładowej karty (front i tył) w wybranym motywie:</div>
-            <div className="flex gap-4 justify-center flex-wrap">
-              <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current['sample']=el; }}} song={sampleSong} theme={theme} intensity={intensity} face="front" columns={columns} />
-              <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current['sample']=el; }}} song={sampleSong} theme={theme} intensity={intensity} face="back" columns={columns} />
+          <div style={{marginTop:16}}>
+            <div style={{opacity:.7,fontSize:14,marginBottom:8}}>Podgląd przykładowej karty (front i tył):</div>
+            <div style={{display:'flex',gap:16,justifyContent:'center',flexWrap:'wrap'}}>
+              <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current['sample']=el; }}} song={sampleSong} face="front" columns={columns} />
+              <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current['sample']=el; }}} song={sampleSong} face="back" columns={columns} />
             </div>
           </div>
         </section>
 
         {songs.length > 0 && (
-          <section className="grid md:grid-cols-2 gap-6">
+          <section style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:24}}>
             {songs.map(song => (
-              <div key={song.id} className="bg-slate-800/30 border border-slate-700 rounded-lg p-3">
-                <div className="text-sm opacity-70 mb-2">Podgląd (front i tył)</div>
-                <div className="flex gap-4 justify-center flex-wrap">
-                  <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current[song.id]=el; }}} song={song} theme={theme} intensity={intensity} face="front" columns={columns} />
-                  <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current[song.id]=el; }}} song={song} theme={theme} intensity={intensity} face="back" columns={columns} />
+              <div key={song.id} style={{background:'rgba(30,41,59,.4)',border:'1px solid #334155',borderRadius:12,padding:12}}>
+                <div style={{opacity:.7,fontSize:14,marginBottom:8}}>Podgląd (front i tył)</div>
+                <div style={{display:'flex',gap:16,justifyContent:'center',flexWrap:'wrap'}}>
+                  <CardSVG ref={(el)=>{ if (el) { svgRefsFront.current[song.id]=el; }}} song={song} face="front" columns={columns} />
+                  <CardSVG ref={(el)=>{ if (el) { svgRefsBack.current[song.id]=el; }}} song={song} face="back" columns={columns} />
                 </div>
               </div>
             ))}
