@@ -89,15 +89,14 @@ export default function App() {
               onChange={(e) => setTheme(e.target.value)}
               className="bg-slate-800 border border-slate-700 rounded px-3 py-2"
             >
+              <option value="frame-art">Frame Art</option>
+              <option value="brackets">Corner Brackets</option>
+              <option value="gradient-fade">Gradient Fade</option>
+              <option value="eq-bars">EQ Bars</option>
+              <option value="cassette">Cassette Label</option>
+              <option value="bw-contrast">BW Contrast</option>
               <option value="bw-classic">BW Classic</option>
               <option value="bw-minimal">BW Minimal</option>
-              <option value="bw-contrast">BW Contrast</option>
-              <option value="bw-dotgrid">BW DotGrid</option>
-              <option value="bw-halftone">BW Halftone (Vinyl)</option>
-              <option value="bw-waveform">BW Waveform</option>
-              <option value="bw-ticket">BW Ticket (Perforation)</option>
-              <option value="bw-hatch">BW Hatch (Diagonal)</option>
-              <option value="bw-retro">BW Retro Corners</option>
             </select>
 
             <label className="text-sm opacity-80">Intensywność:</label>
