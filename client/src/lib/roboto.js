@@ -1,4 +1,6 @@
-// Rejestruje Roboto w jsPDF z LOKALNYCH plików w public/ (bez CDN).
+// client/src/lib/roboto.js
+// Rejestruje Roboto w jsPDF z LOKALNYCH plików w public/ (bez CDN, bez node_modules).
+
 async function urlToBase64(url) {
   const r = await fetch(url);
   if (!r.ok) throw new Error('Font fetch failed: ' + url);
@@ -13,9 +15,8 @@ async function urlToBase64(url) {
 }
 
 export async function ensureRobotoForPDF(doc) {
-  // jeśli już dodane – wyjdź
   const list = doc.getFontList?.() || {};
-  if (list['Roboto']) return;
+  if (list['Roboto']) return; // już dodane
 
   const [reg, bold, italic] = await Promise.all([
     urlToBase64('/fonts/roboto/Roboto-Regular.ttf'),
