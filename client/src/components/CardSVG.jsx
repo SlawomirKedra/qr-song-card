@@ -4,33 +4,11 @@ import QRCode from 'qrcode';
 const PAGE_W = 210;
 const PAGE_H = 297;
 
-const themeDefs = (theme, intensity=50) => {
-  const op = Math.max(0, Math.min(1, intensity/100));
-  const strong = 0.2 + op*0.5;   // 0.2..0.7
-  const light = 0.05 + op*0.25;  // 0.05..0.3
-  const stroke = 0.3 + op*0.8;   // px
-
-  switch(theme){
-    case 'frame-art':        return { kind:'frame-art', stroke, opStrong: strong, opLight: light };
-    case 'brackets':         return { kind:'brackets', stroke: stroke+0.6, opStrong: strong };
-    case 'gradient-fade':    return { kind:'gradient', opLight: light, opStrong: strong };
-    case 'eq-bars':          return { kind:'eq-bars', opStrong: strong };
-    case 'cassette':         return { kind:'cassette', opStrong: strong, opLight: light };
-    case 'bw-contrast':      return { kind:'none', border: 0.7 };
-    case 'bw-minimal':       return { kind:'none', border: 0.3, subtle: true };
-    case 'bw-classic':
-    default:                 return { kind:'none', border: 0.45 };
-  }
-};
-
-const CardSVG = forwardRef(function CardSVG({ song, theme='frame-art', intensity=60, face='front', columns=5 }, ref) {
-  // Physical size based on column count (preview == PDF)
-  const margin = 4; // mm outer margin used by PDF composer; we mirror for preview
+const CardSVG = forwardRef(function CardSVG({ song, face='front', columns=5 }, ref) {
+  const margin = 4;
   const cols = Number(columns);
   const availW = PAGE_W - margin * (cols + 1);
-  const wmm = availW / cols;
-  const aspect = 37/52;
-  const hmm = wmm / aspect;
+  const S = availW / cols;   // square side
 
   const [qrSVG, setQrSVG] = useState('');
 
@@ -43,105 +21,50 @@ const CardSVG = forwardRef(function CardSVG({ song, theme='frame-art', intensity
     return () => { cancelled = true; };
   }, [song?.url, song?.title, song?.artist]);
 
-  const defs = useMemo(() => themeDefs(theme, intensity), [theme, intensity]);
+  // Typography (relative to side)
+  const fontArtist = Math.max(3.1, S * 0.095);
+  const fontYear   = Math.max(9.0, S * 0.28);
+  const fontTitle  = Math.max(2.8, S * 0.085);
 
-  // Helpers to render backgrounds
-  const Bg = () => {
-    const inset = 1.8;
-    if (defs.kind === 'frame-art') {
-      const r1=3, r2=2;
-      return <g stroke='black' fill='none'>
-        <rect x={inset} y={inset} width={wmm-2*inset} height={hmm-2*inset} rx={r1} ry={r1} strokeOpacity={defs.opStrong} strokeWidth='0.6'/>
-        <rect x={inset+2} y={inset+2} width={wmm-2*(inset+2)} height={hmm-2*(inset+2)} rx={r2} ry={r2} strokeOpacity={defs.opLight} strokeWidth='0.45'/>
-        {/* corner deco */}
-        <g strokeOpacity={defs.opStrong} strokeWidth='0.6'>
-          <path d={`M ${inset+4} ${inset+0.8} h 6`} />
-          <path d={`M ${inset+0.8} ${inset+4} v 6`} />
-          <path d={`M ${wmm-inset-10} ${inset+0.8} h 6`} />
-          <path d={`M ${wmm-inset-0.8} ${inset+4} v 6`} />
-          <path d={`M ${inset+0.8} ${hmm-inset-10} v -6`} />
-          <path d={`M ${inset+4} ${hmm-inset-0.8} h 6`} />
-          <path d={`M ${wmm-inset-0.8} ${hmm-inset-10} v -6`} />
-          <path d={`M ${wmm-inset-10} ${hmm-inset-0.8} h 6`} />
-        </g>
-      </g>;
-    }
-    if (defs.kind === 'brackets') {
-      const l=7; // bracket length
-      return <g stroke='black' strokeWidth={1.2} strokeOpacity={defs.opStrong} fill='none'>
-        {/* four corner L */}
-        <path d={`M ${inset} ${inset+l} V ${inset} H ${inset+l}`} />
-        <path d={`M ${wmm-inset-l} ${inset} H ${wmm-inset} V ${inset+l}`} />
-        <path d={`M ${inset} ${hmm-inset-l} V ${hmm-inset} H ${inset+l}`} />
-        <path d={`M ${wmm-inset-l} ${hmm-inset} H ${wmm-inset} V ${hmm-inset-l}`} />
-      </g>;
-    }
-    if (defs.kind === 'gradient') {
-      return <>
-        <defs>
-          <radialGradient id="fade" cx="50%" cy="50%" r="65%">
-            <stop offset="0%" stopColor="black" stopOpacity={defs.opLight}/>
-            <stop offset="100%" stopColor="black" stopOpacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect x="0" y="0" width={wmm} height={hmm} fill="url(#fade)" />
-      </>;
-    }
-    if (defs.kind === 'eq-bars') {
-      const bars=[];
-      const step = 2.2;
-      for(let x=1; x<wmm-1; x+=step){
-        const h = (Math.sin(x*0.35)+1)/2 * (hmm*0.35) + hmm*0.15;
-        bars.push(<rect key={x} x={x} y={hmm-h} width={step*0.6} height={h} fill="black" opacity={defs.opStrong}/>);
-      }
-      return <g>{bars}</g>;
-    }
-    if (defs.kind === 'cassette') {
-      const bandH = hmm*0.18;
-      return <g>
-        <rect x="0" y={hmm*0.1} width={wmm} height={bandH} fill="black" opacity={defs.opLight}/>
-        <rect x="0" y={hmm*0.72} width={wmm} height={bandH} fill="black" opacity={defs.opLight}/>
-        {/* small reels icon */}
-        <g opacity={defs.opStrong}>
-          <circle cx={wmm*0.28} cy={hmm*0.2} r="1.6" fill="white" stroke="black" strokeWidth="0.4"/>
-          <circle cx={wmm*0.72} cy={hmm*0.2} r="1.6" fill="white" stroke="black" strokeWidth="0.4"/>
-          <circle cx={wmm*0.28} cy={hmm*0.2} r="0.5" fill="black"/><circle cx={wmm*0.72} cy={hmm*0.2} r="0.5" fill="black"/>
-        </g>
-      </g>;
-    }
-    return null;
-  };
-
-  const fontArtist = 3.6; // mm ~ 10pt
-  const fontYear = 8.2;   // mm ~ 22pt
-  const fontTitle = 3.2;  // mm ~ 9pt
-
-  const A = song?.artist || 'Wykonawca';
+  const A = song?.artist || 'Artist';
   const Y = song?.year || '1991';
-  const T = song?.title || 'Tytuł utworu';
+  const T = song?.title || 'Song Title';
 
-  // QR box: 90% of the smaller card side => duży QR
-  const qrSide = Math.min(wmm, hmm) * 0.9;
-  const qrX = (wmm - qrSide) / 2;
-  const qrY = (hmm - qrSide) / 2;
+  function wrap(text, maxChars){
+    const words = String(text).split(' ');
+    let line = ''; const lines = [];
+    for (const w of words){
+      if ((line + ' ' + w).trim().length <= maxChars) line = (line + ' ' + w).trim();
+      else { if (line) lines.push(line); line = w; }
+    }
+    if (line) lines.push(line);
+    if (lines.length > 2) {
+      const first = lines.slice(0, Math.ceil(lines.length/2)).join(' ');
+      const second = lines.slice(Math.ceil(lines.length/2)).join(' ');
+      return [first, second];
+    }
+    return lines;
+  }
+  const A_lines = wrap(A, S < 43 ? 16 : 20);
+  const T_lines = wrap(T, S < 43 ? 18 : 24);
+
+  const qrSide = S * 0.96;
+  const qrX = (S - qrSide) / 2;
+  const qrY = (S - qrSide) / 2;
 
   return (
-    <svg ref={ref}
-      xmlns="http://www.w3.org/2000/svg"
-      width={`${wmm}mm`} height={`${hmm}mm`}
-      viewBox={`0 0 ${wmm} ${hmm}`}
-    >
-      {/* border */}
-      <rect x="0.4" y="0.4" width={wmm-0.8} height={hmm-0.8} fill="white" stroke="black" strokeWidth={defs.border || 0.5} opacity="0.98" />
-
+    <svg ref={ref} xmlns="http://www.w3.org/2000/svg" width={`${S}mm`} height={`${S}mm`} viewBox={`0 0 ${S} ${S}`}>
+      <rect x="0.4" y="0.4" width={S-0.8} height={S-0.8} fill="white" stroke="black" strokeWidth="0.45" opacity="0.98" />
       {face==='back' && (<g>
-        <Bg/>
-        {/* central stack */}
-        <text x={wmm/2} y={hmm*0.36} fontFamily="Helvetica" fontWeight="700" fontSize={fontArtist} textAnchor="middle" fill="black">{A}</text>
-        <text x={wmm/2} y={hmm*0.52} fontFamily="Helvetica" fontWeight="800" fontSize={fontYear} textAnchor="middle" fill="black" letterSpacing="0.2">{Y}</text>
-        <text x={wmm/2} y={hmm*0.66} fontFamily="Helvetica" fontWeight="500" fontSize={fontTitle} textAnchor="middle" fill="black">{T}</text>
+        <rect x="1.4" y="1.4" width={S-2.8} height={S-2.8} fill="none" stroke="black" strokeWidth="0.25" opacity="0.4" rx="2" ry="2"/>
+        {A_lines.map((line, i) => (
+          <text key={i} x={S/2} y={S*0.30 + i*fontArtist*1.1} fontFamily="Helvetica" fontWeight="700" fontSize={fontArtist} textAnchor="middle" fill="black">{line}</text>
+        ))}
+        <text x={S/2} y={S*0.52} fontFamily="Helvetica" fontWeight="800" fontSize={fontYear} textAnchor="middle" fill="black" letterSpacing="0.2">{Y}</text>
+        {T_lines.map((line, i) => (
+          <text key={i} x={S/2} y={S*0.70 + i*fontTitle*1.15} fontFamily="Helvetica" fontStyle="italic" fontWeight="500" fontSize={fontTitle} textAnchor="middle" fill="black">{line}</text>
+        ))}
       </g>)}
-
       {face==='front' && (<g>
         <rect x={qrX} y={qrY} width={qrSide} height={qrSide} fill="white" stroke="black" strokeWidth="0.6" rx="1.2" ry="1.2"/>
         <g transform={`translate(${qrX+1}, ${qrY+1}) scale(${(qrSide-2)/100})`} dangerouslySetInnerHTML={{__html: qrSVG}}/>
